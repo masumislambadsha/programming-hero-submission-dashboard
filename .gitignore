@@ -34,3 +34,7 @@ coverage/
 
 # Prisma
 server/prisma/*.db
+
+# Local QA artifacts (screenshots, token dumps)
+.qa/
+.playwright-mcp/

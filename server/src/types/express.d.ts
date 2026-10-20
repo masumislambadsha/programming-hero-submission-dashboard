@@ -8,8 +8,14 @@ export type AuthUser = {
 declare global {
   namespace Express {
     interface Request {
-      /** Set by `requireAuth` after verifying the JWT. */
+      /** Set by `checkAuth` after verifying the JWT. */
       user?: AuthUser;
+      /** Set by `validate` — parsed/coerced body, query and params. */
+      validated?: {
+        body?: unknown;
+        query?: unknown;
+        params?: unknown;
+      };
     }
   }
 }

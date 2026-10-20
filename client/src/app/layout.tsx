@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, Poppins } from "next/font/google";
 import "./globals.css";
-import { AuthProvider } from "@/components/auth-provider";
-import { Toaster } from "@/components/ui/sonner";
+import Providers from "@/providers";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -36,8 +35,7 @@ export default function RootLayout({
       <body
         className={`${inter.variable} ${poppins.variable} min-h-screen bg-background font-sans text-foreground antialiased`}
       >
-        <AuthProvider>{children}</AuthProvider>
-        <Toaster theme="dark" position="top-center" richColors />
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

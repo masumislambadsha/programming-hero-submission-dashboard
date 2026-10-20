@@ -39,10 +39,33 @@ Haiti `#0C0518` ✨).
 - 👨‍🎓 Students self-signup; 🧑‍ mentors/admins are **seeded directly in the
   database** (no API endpoint can ever create a privileged account)
 - 🚧 Route guards on three layers:
-  1. `client/src/proxy.ts` (Next.js 16 proxy) — cookie presence gate
-  2. page-level server checks — role redirect
-  3. Express `requireAuth` + `requireRole("MENTOR")` middleware — the API
+  1. `client/src/proxy.ts` (Next.js 16 proxy) — session cookie + JWT role claim
+     for redirect UX (unverified by design; Edge can't hold the secret)
+  2. client `useMe()` guards — role-aware redirects inside the pages
+  3. Express `checkAuth` + `requireRole("MENTOR")` middleware — the API
      itself never trusts the frontend
+
+---
+
+## ✅ Requirement Coverage
+
+| Assessment requirement | Implementation |
+| ---------------------- | -------------- |
+| TypeScript end-to-end | strict TS across `shared/`, `server/`, `client/` |
+| Next.js + Tailwind + shadcn | App Router, Tailwind v4 tokens, shadcn/base-ui components |
+| Express + PostgreSQL + Prisma | `server/src/app.ts`, `server/prisma/schema.prisma` |
+| JWT role-based auth | httpOnly JWT cookie + `checkAuth` / `requireRole` |
+| Student submission form | `components/modules/student/submission-form.tsx` |
+| Robust validation | shared Zod schemas + `validate` middleware (client reuses them) |
+| Duplicate prevention | URL normalization → friendly 409 → DB `@@unique([studentId, repoUrl])` |
+| Rate limiting | 5 submissions / 15 min per user, keyed by user id |
+| Paginated mentor table | Prisma `skip`/`take` + `meta` pagination envelope |
+| Approve / reject | `PATCH /submissions/:id/review` + `ReviewFeedback` model |
+| Server-side status filters | `?status=` → Prisma `where`, never client-side slicing |
+| Aggregated stats | four `count()` queries + 30s TTL cache, invalidated on writes |
+| Login + student signup | `/login`, `/signup` (role never accepted from the client) |
+| Seeded admin/mentor | `server/prisma/seed.ts` |
+| One-click demo login | Student / Mentor buttons on `/login` |
 
 ---
 
@@ -50,7 +73,7 @@ Haiti `#0C0518` ✨).
 
 | Layer      | Tech                                                        |
 | ---------- | ----------------------------------------------------------- |
-| Frontend   | Next.js 16 (App Router, Server Components) · TailwindCSS v4 · shadcn/ui |
+| Frontend   | Next.js 16 (App Router) · TanStack Query · TailwindCSS v4 · shadcn/ui |
 | Backend    | Express 5 · Zod · helmet · cors · express-rate-limit         |
 | Database   | PostgreSQL 16 · Prisma ORM 6                                |
 | Auth       | JWT (`jsonwebtoken`) · bcryptjs · httpOnly cookies          |
@@ -64,20 +87,36 @@ types and constants — the form and the API can never disagree.
 ## 📂 Structure
 
 ```
-├── client/                # Next.js app
+├── client/                       # Next.js app
 │   └── src/
-│       ├── app/           # routes: /login /signup /dashboard /mentor
-│       ├── components/    # auth, navbar, submission form, mentor dashboard
-│       ├── lib/           # api.ts (browser fetch), server-api.ts (RSC fetch)
-│       └── proxy.ts       # route guard (Next 16 "middleware")
-├── server/                # Express API
-│   ├── prisma/            # schema.prisma + seed.ts
+│       ├── app/
+│       │   ├── (public)/(authentication)/   # /login /signup
+│       │   ├── (public)/(marketing)/        # /
+│       │   └── (dashboard)/                 # /dashboard /mentor
+│       ├── api/                  # typed API functions (auth.api.ts, submission.api.ts)
+│       ├── hooks/                # TanStack Query hooks (auth.hook.ts, submission.hook.ts)
+│       ├── components/
+│       │   ├── layout/           # navbar, auth shell
+│       │   ├── modules/          # auth / student / mentor feature components
+│       │   └── ui/               # shadcn primitives
+│       ├── providers/            # QueryClientProvider + Toaster
+│       ├── types/                # shared type re-exports
+│       ├── lib/                  # apiClient, roles, utils
+│       └── proxy.ts              # route guard (Next 16 "middleware")
+├── server/                       # Express API
+│   ├── prisma/                   # schema.prisma + seed.ts
 │   └── src/
-│       ├── routes/        # auth + submissions routers
-│       ├── services/      # business logic (kept out of routes)
-│       ├── middleware/    # auth, validation, rate limits, error handler
-│       └── lib/           # prisma, jwt, cookies
-└── shared/                # zod schemas + types used by BOTH apps
+│       ├── app/
+│       │   ├── config/           # env validation + typed config
+│       │   ├── lib/              # prisma, jwt, cookies
+│       │   ├── middleware/       # checkAuth, validate, rateLimiter, errors
+│       │   ├── module/
+│       │   │   ├── auth/         # route · controller · service · validation · interface
+│       │   │   └── submission/   # route · controller · service · validation · interface
+│       │   └── utils/            # AppError, catchAsync, pagination, sendResponse
+│       ├── app.ts                # express app + route mounting
+│       └── server.ts             # listen + graceful shutdown
+└── shared/                       # zod schemas + types used by BOTH apps
 ```
 
 ---
@@ -125,15 +164,19 @@ Open **http://localhost:3000** 🚀
 
 | Method | Endpoint                          | Access  | Notes                                |
 | ------ | --------------------------------- | ------- | ------------------------------------ |
-| POST   | `/api/auth/signup`                | public  | students only, role forced server-side |
-| POST   | `/api/auth/login`                 | public  | sets httpOnly JWT cookie             |
-| POST   | `/api/auth/logout`                | public  | clears cookie                        |
-| GET    | `/api/auth/me`                    | any     | current user (fresh from DB)         |
-| POST   | `/api/submissions`                | student | rate-limited 5/15min, dup-checked    |
-| GET    | `/api/submissions/mine`           | student | own submissions + feedback           |
-| GET    | `/api/submissions`                | mentor  | `?status=&page=&limit=` server-side  |
-| GET    | `/api/submissions/stats`          | mentor  | aggregated counts (cached ~30s)      |
-| PATCH  | `/api/submissions/:id/review`     | mentor  | approve/reject + optional note       |
+| POST   | `/api/v1/auth/signup`             | public  | students only, role forced server-side |
+| POST   | `/api/v1/auth/login`              | public  | sets httpOnly JWT cookie             |
+| POST   | `/api/v1/auth/logout`             | public  | clears cookie                        |
+| GET    | `/api/v1/auth/me`                 | any     | current user (fresh from DB)         |
+| POST   | `/api/v1/submissions`             | student | rate-limited 5/15min, dup-checked    |
+| GET    | `/api/v1/submissions/mine`        | student | own submissions + feedback           |
+| GET    | `/api/v1/submissions`             | mentor  | `?status=&page=&limit=` server-side  |
+| GET    | `/api/v1/submissions/stats`       | mentor  | aggregated counts (cached ~30s)      |
+| PATCH  | `/api/v1/submissions/:id/review`  | mentor  | approve/reject + optional note       |
+
+Every response uses one envelope: `{ success, message, data, meta }` on
+success and `{ success, message, errors }` on failure (field-keyed errors feed
+the forms directly).
 
 In development the Next.js server proxies `/api/*` → `http://localhost:4000`,
 so the browser only ever talks to one origin and cookies flow without CORS.
@@ -180,7 +223,7 @@ pnpm db:seed                     # optional demo data
 
 Deployment sketch (Render / Railway / Vercel + Neon):
 
-1. **server** — build `pnpm --filter server build`, run `node dist/index.js`,
+1. **server** — build `pnpm --filter server build`, run `node dist/server.js`,
    set `JWT_SECRET`, `COOKIE_SECURE=true`, `CLIENT_ORIGIN=https://<your-domain>`
 2. **client** — deploy `client/` to Vercel/Node, set `API_PROXY_URL` to the
    deployed API origin

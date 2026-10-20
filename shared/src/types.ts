@@ -24,7 +24,8 @@ export type Submission = {
   status: SubmissionStatus;
   reviewedAt: string | null;
   createdAt: string;
-  feedback: SubmissionFeedback[];
+  /** Present on student queries; mentor lists expose `_count` instead. */
+  feedback?: SubmissionFeedback[];
   student?: { id: string; name: string; email: string };
   reviewer?: { id: string; name: string } | null;
   _count?: { feedback: number };

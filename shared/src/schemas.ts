@@ -110,9 +110,11 @@ export type ApiError = {
   errors?: Record<string, string[]>;
 };
 
-export type ApiSuccess<T> = {
+export type ApiSuccess<T, M = unknown> = {
   success: true;
+  message: string;
   data: T;
+  meta?: M | null;
 };
 
 export type ApiResponse<T> = ApiSuccess<T> | ApiError;
