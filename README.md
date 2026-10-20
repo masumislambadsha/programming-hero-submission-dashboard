@@ -163,6 +163,30 @@ mentor dashboard data flow map directly onto the lesson topics.
 
 ---
 
+## ☁️ Cloud Database (Neon) & Deployment
+
+A free Neon branch is provisioned for the demo: **`ph-submissions`**
+(project `polished-silence-98779098`, region `aws-ap-southeast-1`,
+PostgreSQL 17, database `ph_submissions`), migrated and seeded.
+
+To point the API at it, replace `DATABASE_URL` in `server/.env` with the
+connection string from the [Neon console](https://console.neon.tech)
+(project → Connect → pooled), then:
+
+```bash
+pnpm --filter server db:deploy   # apply migrations
+pnpm db:seed                     # optional demo data
+```
+
+Deployment sketch (Render / Railway / Vercel + Neon):
+
+1. **server** — build `pnpm --filter server build`, run `node dist/index.js`,
+   set `JWT_SECRET`, `COOKIE_SECURE=true`, `CLIENT_ORIGIN=https://<your-domain>`
+2. **client** — deploy `client/` to Vercel/Node, set `API_PROXY_URL` to the
+   deployed API origin
+3. Prisma migrations run with `prisma migrate deploy` (never `migrate dev`)
+   in the deploy step
+
 ## 📄 License
 
 MIT — built as an assessment submission for Programming Hero.
