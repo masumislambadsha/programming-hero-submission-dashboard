@@ -25,6 +25,38 @@ function LoginForm() {
   const [password, setPassword] = useState("");
   const [errors, setErrors] = useState<FieldErrors>({});
   const [pending, setPending] = useState(false);
+  const [demoPending, setDemoPending] = useState<"STUDENT" | "MENTOR" | null>(null);
+
+  /** Shared post-login step: safe redirect + fresh server data. */
+  function finishLogin(user: { name: string; role: "STUDENT" | "MENTOR" }) {
+    toast.success(`Welcome back, ${user.name.split(" ")[0]}! 🚀`);
+    const from = searchParams.get("from");
+    // Only allow same-site redirects (never an absolute URL from the query).
+    const target =
+      from && from.startsWith("/") && !from.startsWith("//") ? from : homeFor(user.role);
+    router.push(target);
+    router.refresh();
+  }
+
+  /** One-click login for the seeded demo accounts (handy for reviewers). */
+  async function quickLogin(role: "STUDENT" | "MENTOR") {
+    const creds =
+      role === "STUDENT"
+        ? { email: "rafi@student.com", password: "Student123!" }
+        : { email: "admin@programming-hero.com", password: "Mentor123!" };
+
+    setEmail(creds.email);
+    setPassword(creds.password);
+    setErrors({});
+    setDemoPending(role);
+
+    try {
+      finishLogin(await login(creds));
+    } catch (err) {
+      toast.error(err instanceof ApiRequestError ? err.message : "Something went wrong.");
+      setDemoPending(null);
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -45,14 +77,7 @@ function LoginForm() {
 
     // 2) Server decides the truth.
     try {
-      const user = await login(parsed.data);
-      toast.success(`Welcome back, ${user.name.split(" ")[0]}! 🚀`);
-
-      const from = searchParams.get("from");
-      // Only allow same-site redirects (never an absolute URL from the query).
-      const target = from && from.startsWith("/") && !from.startsWith("//") ? from : homeFor(user.role);
-      router.push(target);
-      router.refresh();
+      finishLogin(await login(parsed.data));
     } catch (err) {
       if (err instanceof ApiRequestError) {
         setErrors(err.errors ?? {});
@@ -94,17 +119,55 @@ function LoginForm() {
         {errors.password && <p className="text-xs text-destructive">{errors.password[0]}</p>}
       </div>
 
-      <Button type="submit" className="w-full font-heading font-semibold glow-sm" disabled={pending}>
+      <Button
+        type="submit"
+        className="w-full font-heading font-semibold glow-sm"
+        disabled={pending || demoPending !== null}
+      >
         {pending ? "Logging in..." : "Login →"}
       </Button>
 
       <Separator />
 
-      <div className="rounded-lg border border-border/70 bg-muted/40 p-3 text-xs text-muted-foreground">
-        <p className="mb-1.5 font-medium text-foreground">Demo accounts_</p>
-        <p>👨‍🎓 Student — rafi@student.com / Student123!</p>
-        <p>🧑‍🏫 Mentor — admin@programming-hero.com / Mentor123!</p>
+      <div className="space-y-2 rounded-lg border border-border/70 bg-muted/40 p-3">
+        <p className="text-xs font-medium text-foreground">Demo login_</p>
+        <p className="text-[11px] text-muted-foreground">
+          One click — no typing. Uses the seeded demo accounts.
+        </p>
+        <div className="grid gap-2 pt-1">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => quickLogin("STUDENT")}
+            disabled={demoPending !== null || pending}
+            className="justify-between border-success/30 bg-success/5 hover:border-success/60 hover:bg-success/10"
+          >
+            <span>👨‍🎓 Login as Student</span>
+            <span className="text-[11px] font-normal text-muted-foreground">
+              {demoPending === "STUDENT" ? "Logging in..." : "rafi@student.com →"}
+            </span>
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => quickLogin("MENTOR")}
+            disabled={demoPending !== null || pending}
+            className="justify-between border-primary/30 bg-primary/5 hover:border-primary/60 hover:bg-primary/10"
+          >
+            <span>🧑‍🏫 Login as Mentor</span>
+            <span className="text-[11px] font-normal text-muted-foreground">
+              {demoPending === "MENTOR" ? "Logging in..." : "admin@programming-hero.com →"}
+            </span>
+          </Button>
+        </div>
       </div>
+
+      <p className="text-center text-[11px] text-muted-foreground">
+        Passwords — student: <span className="font-mono">Student123!</span> · mentor:{" "}
+        <span className="font-mono">Mentor123!</span>
+      </p>
 
       <p className="text-center text-sm text-muted-foreground">
         New here?{" "}
