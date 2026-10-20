@@ -1,0 +1,14 @@
+diff --git a/package.json b/package.json
+index fd8fadf8fd353a33790e3b136f3be91000ac3620..e33f9f5483e5da805ff7e81a480ad39dced56b50 100644
+--- a/package.json
++++ b/package.json
+@@ -38,7 +38,8 @@
+   "type": "module",
+   "exports": {
+     ".": {
+-      "style": "./dist/tw-animate.css"
++      "style": "./dist/tw-animate.css",
++      "default": "./dist/tw-animate.css"
+     },
+     "./prefix": {
+       "style": "./dist/tw-animate-prefix.css"
