@@ -1,0 +1,25 @@
+// User = students (self-signup) + mentors (seeded only).
+//
+// Relations (intentional, also teaching material):
+// - User 1—N Submission as *student*
+// - User 1—N Submission as *reviewer*
+// - User 1—N ReviewFeedback as the note author
+// Two distinct Submission relations on the same pair of tables, named so
+// Prisma (and humans) can tell them apart.
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         Role     @default(STUDENT)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations -------------------------------------------------------
+  submissions   Submission[]     @relation("StudentSubmissions")
+  reviewedSubs  Submission[]     @relation("ReviewedSubmissions")
+  feedbackNotes ReviewFeedback[]
+
+  @@index([role])
+}

@@ -1,0 +1,33 @@
+// A student's project submission + the mentor's review decision.
+//
+// Duplicate prevention lives partly HERE: @@unique([studentId, repoUrl]).
+// App-level checks give friendly errors; this constraint is the guarantee.
+// reviewerId is optional + SetNull: a deleted mentor must not delete
+// students' submissions.
+
+model Submission {
+  id          String           @id @default(cuid())
+  projectName String
+  repoUrl     String
+  liveUrl     String?
+  description String
+  status      SubmissionStatus @default(PENDING)
+
+  studentId String
+  student   User   @relation("StudentSubmissions", fields: [studentId], references: [id], onDelete: Cascade)
+
+  reviewerId String?
+  reviewer   User?    @relation("ReviewedSubmissions", fields: [reviewerId], references: [id], onDelete: SetNull)
+  reviewedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  feedback ReviewFeedback[]
+
+  // A student cannot submit the same repository twice.
+  @@unique([studentId, repoUrl])
+  // Server-side status filter + "my submissions" lookups.
+  @@index([status])
+  @@index([studentId, createdAt])
+}

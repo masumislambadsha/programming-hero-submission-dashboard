@@ -1,0 +1,12 @@
+// Base Prisma config — generator + datasource only.
+// Models live in one file per domain: user.prisma, submission.prisma,
+// feedback.prisma; enums.prisma holds the shared enums.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}

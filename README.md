@@ -104,7 +104,7 @@ types and constants — the form and the API can never disagree.
 │       ├── lib/                  # apiClient, roles, utils
 │       └── proxy.ts              # route guard (Next 16 "middleware")
 ├── server/                       # Express API
-│   ├── prisma/                   # schema.prisma + seed.ts
+│   ├── prisma/                   # schema/*.prisma (one file per model) + seed.ts
 │   └── src/
 │       ├── app/
 │       │   ├── config/           # env validation + typed config
