@@ -20,7 +20,7 @@ app.use(helmet());
 // credentialed CORS keeps direct API access (e.g. curl, mobile) working.
 app.use(
   cors({
-    origin: config.app.clientOrigin,
+    origin: config.app.clientOrigins,
     credentials: true,
   }),
 );

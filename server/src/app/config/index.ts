@@ -35,7 +35,11 @@ const config = {
   app: {
     env: env.NODE_ENV,
     port: env.PORT,
-    clientOrigin: env.CLIENT_ORIGIN,
+    // Comma-separated in the env var so local dev + the deployed client can
+    // both be allowed without another deploy just for CORS.
+    clientOrigins: env.CLIENT_ORIGIN.split(",")
+      .map((origin) => origin.trim())
+      .filter(Boolean),
     apiPrefix: "/api/v1",
   },
   jwt: {
