@@ -53,7 +53,7 @@ Haiti `#0C0518` ✨).
 | ---------------------- | -------------- |
 | TypeScript end-to-end | strict TS across `shared/`, `server/`, `client/` |
 | Next.js + Tailwind + shadcn | App Router, Tailwind v4 tokens, shadcn/base-ui components |
-| Express + PostgreSQL + Prisma | `server/src/app.ts`, `server/prisma/schema.prisma` |
+| Express + PostgreSQL + Prisma | `server/src/app.ts`, `server/prisma/schema/*.prisma` |
 | JWT role-based auth | httpOnly JWT cookie + `checkAuth` / `requireRole` |
 | Student submission form | `components/modules/student/submission-form.tsx` |
 | Robust validation | shared Zod schemas + `validate` middleware (client reuses them) |
@@ -206,29 +206,67 @@ mentor dashboard data flow map directly onto the lesson topics.
 
 ---
 
-## ☁️ Cloud Database (Neon) & Deployment
+## ☁️ Live Demo & Deployment
 
-A free Neon branch is provisioned for the demo: **`ph-submissions`**
-(project `polished-silence-98779098`, region `aws-ap-southeast-1`,
-PostgreSQL 17, database `ph_submissions`), migrated and seeded.
+| App           | URL                                              |
+| ------------- | ------------------------------------------------ |
+| **Dashboard** | https://ph-submissions-web.onrender.com          |
+| **API**       | https://ph-submissions-api.onrender.com/api/v1   |
+| **Health**    | https://ph-submissions-api.onrender.com/api/v1/health |
 
-To point the API at it, replace `DATABASE_URL` in `server/.env` with the
-connection string from the [Neon console](https://console.neon.tech)
-(project → Connect → pooled), then:
+Both apps are deployed on **Render** (Singapore, free plan) and auto-deploy
+from `main`. Free instances spin down when idle — the first request can take
+up to ~60 seconds to cold-start.
+
+The database is **Neon PostgreSQL 17** (project `polished-silence-98779098`,
+pooled connection, `ph_submissions`), migrated with `prisma migrate deploy`
+and seeded with the demo accounts above.
+
+### Environment variables
+
+**API — Render web service**
+
+| Key              | Value                                                        |
+| ---------------- | ------------------------------------------------------------ |
+| `DATABASE_URL`   | Neon **pooled** connection string (`...-pooler...?sslmode=require`) |
+| `JWT_SECRET`     | 32-byte random hex (`openssl rand -hex 32`)                  |
+| `JWT_EXPIRES_IN` | `12h`                                                        |
+| `COOKIE_SECURE`  | `true` (HTTPS)                                               |
+| `CLIENT_ORIGIN`  | comma-separated origins, e.g. `http://localhost:3000,https://ph-submissions-web.onrender.com` |
+| `NODE_ENV`       | `production`                                                 |
+| `NODE_VERSION`   | `22.14.0`                                                    |
+
+**Client — Render web service**
+
+| Key               | Value                                    |
+| ----------------- | ---------------------------------------- |
+| `API_PROXY_URL`   | `https://ph-submissions-api.onrender.com` |
+| `NODE_ENV`        | `production`                             |
+| `NODE_VERSION`    | `22.14.0`                                |
+
+The Next.js rewrite proxies `/api/*` to `API_PROXY_URL` **server-side**, so the
+browser only ever talks to one origin and the httpOnly cookie flows without
+CORS.
+
+### Deploy notes
 
 ```bash
-pnpm --filter server db:deploy   # apply migrations
-pnpm db:seed                     # optional demo data
+# API build / start
+corepack enable && pnpm install --frozen-lockfile --prod=false \
+  && pnpm --filter @ph/shared build && pnpm --filter server build
+node server/dist/server.js
+
+# Client build / start
+corepack enable && pnpm install --frozen-lockfile --prod=false \
+  && pnpm --filter @ph/shared build && pnpm --filter client build
+pnpm --filter client start
 ```
 
-Deployment sketch (Render / Railway / Vercel + Neon):
-
-1. **server** — build `pnpm --filter server build`, run `node dist/server.js`,
-   set `JWT_SECRET`, `COOKIE_SECURE=true`, `CLIENT_ORIGIN=https://<your-domain>`
-2. **client** — deploy `client/` to Vercel/Node, set `API_PROXY_URL` to the
-   deployed API origin
-3. Prisma migrations run with `prisma migrate deploy` (never `migrate dev`)
-   in the deploy step
+- Apply migrations in the release step with
+  `pnpm --filter server db:deploy` (`prisma migrate deploy` — never
+  `migrate dev`). The server build also runs `prisma generate`.
+- Local production check: `pnpm build && pnpm start`, with
+  `CLIENT_ORIGIN` and `API_PROXY_URL` pointed at the local ports.
 
 ## 📄 License
 
